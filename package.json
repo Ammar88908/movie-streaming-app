@@ -1,0 +1,1 @@
+{\n  "name": "movie-streaming-app",\n  "version": "1.0.0",\n  "description": "A movie streaming platform API",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  },\n  "dependencies": {\n    "express": "^4.18.1",\n    "mongoose": "^6.0.14",\n    "dotenv": "^10.0.0"\n  },\n  "author": "Ammar88908",\n  "license": "ISC"\n}
