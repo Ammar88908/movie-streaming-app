@@ -1,1 +1,362 @@
-<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Admin Dashboard</title>\n    <style>\n        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }\n        .container { width: 90%; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }\n        h1 { text-align: center; }\n        form { display: flex; flex-direction: column; }\n        label { margin-bottom: 5px; }\n        input[type='text'], input[type='url'], input[type='password'] { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }\n        button { padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }\n    </style>\n</head>\n<body>\n    <div class="container">\n        <h1>Admin Dashboard</h1>\n        <form id="addMovieForm">\n            <label for="movieUrl">Movie URL:</label>\n            <input type="url" id="movieUrl" name="movieUrl" required>\n\n            <label for="adminPassword">Password:</label>\n            <input type="password" id="adminPassword" name="adminPassword" required>\n\n            <button type="submit">Add Movie</button>\n        </form>\n    </div>\n<script>\n    document.getElementById('addMovieForm').onsubmit = function(event) {\n        event.preventDefault();\n        var movieUrl = document.getElementById('movieUrl').value;\n        var password = document.getElementById('adminPassword').value;\n\n        // Example password check (hardcoded for demonstration)\n        if (password === 'your_password_here') {\n            // Logic to add the movie URL goes here\n            alert('Movie added: ' + movieUrl);\n        } else {\n            alert('Invalid password.');\n        }\n    };\n</script>\n</body>\n</html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>افلامك | لوحة الإدارة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Header -->
+<header class="site-header">
+    <div class="header-inner">
+        <div class="logo" onclick="window.location.href='/'">🎬 افلامك</div>
+        <div class="header-actions">
+            <a href="index.html" class="admin-btn">العودة للموقع</a>
+        </div>
+    </div>
+</header>
+
+<!-- Login Screen -->
+<div id="loginScreen" class="admin-login-screen">
+    <div class="login-box">
+        <div class="login-logo">🔐</div>
+        <h2>لوحة الإدارة</h2>
+        <p>أدخل كلمة المرور للوصول</p>
+        <form id="loginForm" onsubmit="adminLogin(event)">
+            <input type="password" id="adminPassword" class="form-input" placeholder="كلمة المرور" required>
+            <button type="submit" class="btn btn-primary btn-full">دخول</button>
+        </form>
+        <div id="loginError" class="error-msg" style="display:none;">كلمة المرور غير صحيحة</div>
+    </div>
+</div>
+
+<!-- Admin Panel -->
+<div id="adminPanel" class="admin-panel" style="display:none;">
+    <div class="admin-container">
+
+        <!-- Add / Edit Movie Form -->
+        <div class="admin-card">
+            <h2 id="formTitle">➕ إضافة فيلم أو مسلسل</h2>
+            <form id="movieForm" onsubmit="saveMovie(event)">
+                <input type="hidden" id="editId">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>العنوان *</label>
+                        <input type="text" id="movieTitle" class="form-input" placeholder="اسم الفيلم أو المسلسل" required>
+                    </div>
+                    <div class="form-group">
+                        <label>التصنيف *</label>
+                        <select id="movieCategory" class="form-input">
+                            <option value="أفلام">�� أفلام</option>
+                            <option value="مسلسلات">📺 مسلسلات</option>
+                            <option value="أنمي">🎌 أنمي</option>
+                            <option value="وثائقي">🎥 وثائقي</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>الوصف</label>
+                    <textarea id="movieDesc" class="form-input form-textarea" placeholder="وصف مختصر..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>سنة الإصدار</label>
+                        <input type="number" id="movieYear" class="form-input" placeholder="2024" min="1900" max="2099">
+                    </div>
+                    <div class="form-group">
+                        <label>التقييم (1-10)</label>
+                        <input type="number" id="movieRating" class="form-input" placeholder="8.5" min="1" max="10" step="0.1">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>رابط الصورة (Poster URL)</label>
+                    <input type="url" id="moviePoster" class="form-input" placeholder="https://example.com/poster.jpg" oninput="previewPoster()">
+                    <div id="posterPreview" class="poster-preview" style="display:none;">
+                        <img id="posterImg" src="" alt="معاينة الصورة">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>رابط الفيديو *</label>
+                    <input type="text" id="movieVideo" class="form-input" placeholder="YouTube / Vimeo / رابط مباشر" required>
+                    <small class="hint">يدعم: YouTube, Vimeo, وأي رابط فيديو مباشر (.mp4, .m3u8, إلخ)</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">💾 حفظ</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetForm()" id="cancelBtn" style="display:none;">إلغاء التعديل</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Movies List -->
+        <div class="admin-card">
+            <div class="list-header">
+                <h2>📋 قائمة الأفلام والمسلسلات</h2>
+                <input type="text" id="adminSearch" class="form-input search-mini" placeholder="بحث..." oninput="filterAdminList()">
+            </div>
+            <div id="adminMovieList" class="admin-movie-list">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>جاري التحميل...</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const API = '/api';
+    let allMovies = [];
+
+    // Return stored admin token
+    function getToken() {
+        return sessionStorage.getItem('adminToken') || '';
+    }
+
+    // Admin Login
+    async function adminLogin(e) {
+        e.preventDefault();
+        const password = document.getElementById('adminPassword').value;
+        try {
+            const res = await fetch(`${API}/admin/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await res.json();
+            if (data.success && data.token) {
+                sessionStorage.setItem('adminToken', data.token);
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+                loadAdminMovies();
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        } catch (err) {
+            document.getElementById('loginError').style.display = 'block';
+        }
+    }
+
+    // Check if already logged in (token present)
+    if (getToken()) {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        loadAdminMovies();
+    }
+
+    // Load all movies
+    async function loadAdminMovies() {
+        try {
+            const res = await fetch(`${API}/movies`);
+            if (!res.ok) throw new Error('failed');
+            allMovies = await res.json();
+            renderAdminList(allMovies);
+        } catch (err) {
+            document.getElementById('adminMovieList').innerHTML = '<p class="error-msg">خطأ في تحميل البيانات</p>';
+        }
+    }
+
+    // Render admin movie list
+    function renderAdminList(movies) {
+        const container = document.getElementById('adminMovieList');
+        if (!movies.length) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎬</div><p>لا توجد أفلام بعد</p></div>';
+            return;
+        }
+        container.innerHTML = movies.map(m => {
+            const id = escapeHtml(m._id);
+            const posterHtml = m.poster
+                ? `<img src="${escapeAttr(m.poster)}" alt="${escapeHtml(m.title)}" onerror="this.style.display='none'">`
+                : '<div class="no-poster">🎬</div>';
+            return `
+            <div class="admin-movie-item">
+                <div class="admin-movie-poster">${posterHtml}</div>
+                <div class="admin-movie-info">
+                    <div class="admin-movie-title">${escapeHtml(m.title)}</div>
+                    <div class="admin-movie-meta">
+                        <span class="cat-badge">${escapeHtml(m.category)}</span>
+                        <span>${escapeHtml(String(m.year || ''))}</span>
+                        <span>⭐ ${escapeHtml(String(m.rating || ''))}</span>
+                    </div>
+                </div>
+                <div class="admin-movie-actions">
+                    <button class="btn btn-edit" onclick="editMovie('${id}')">✏️ تعديل</button>
+                    <button class="btn btn-delete" onclick="deleteMovie('${id}')">🗑️ حذف</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Filter admin list
+    function filterAdminList() {
+        const q = document.getElementById('adminSearch').value.toLowerCase();
+        renderAdminList(allMovies.filter(m => m.title.toLowerCase().includes(q)));
+    }
+
+    // Authenticated fetch helper
+    function authFetch(url, options = {}) {
+        return fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-token': getToken(),
+                ...(options.headers || {})
+            }
+        });
+    }
+
+    // Save (Add or Update) movie
+    async function saveMovie(e) {
+        e.preventDefault();
+        const payload = {
+            title: document.getElementById('movieTitle').value.trim(),
+            description: document.getElementById('movieDesc').value.trim(),
+            year: parseInt(document.getElementById('movieYear').value) || new Date().getFullYear(),
+            category: document.getElementById('movieCategory').value,
+            rating: parseFloat(document.getElementById('movieRating').value) || 5,
+            poster: document.getElementById('moviePoster').value.trim(),
+            videoUrl: document.getElementById('movieVideo').value.trim()
+        };
+
+        const id = document.getElementById('editId').value;
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.textContent = 'جاري الحفظ...';
+
+        try {
+            let res;
+            if (id) {
+                res = await authFetch(`${API}/movies/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                res = await authFetch(`${API}/movies`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            if (res.ok) {
+                resetForm();
+                await loadAdminMovies();
+                showNotification(id ? 'تم التعديل بنجاح ✅' : 'تمت الإضافة بنجاح ✅');
+            } else if (res.status === 401) {
+                sessionStorage.removeItem('adminToken');
+                showNotification('انتهت الجلسة. يرجى إعادة تسجيل الدخول.', 'error');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                const err = await res.json();
+                showNotification('خطأ: ' + (err.error || 'حدث خطأ'), 'error');
+            }
+        } catch (err) {
+            showNotification('خطأ في الاتصال بالخادم', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '💾 حفظ';
+        }
+    }
+
+    // Edit movie
+    function editMovie(id) {
+        const m = allMovies.find(x => x._id === id);
+        if (!m) return;
+        document.getElementById('editId').value = m._id;
+        document.getElementById('movieTitle').value = m.title;
+        document.getElementById('movieDesc').value = m.description || '';
+        document.getElementById('movieYear').value = m.year || '';
+        document.getElementById('movieCategory').value = m.category;
+        document.getElementById('movieRating').value = m.rating || '';
+        document.getElementById('moviePoster').value = m.poster || '';
+        document.getElementById('movieVideo').value = m.videoUrl || '';
+        document.getElementById('formTitle').textContent = '✏️ تعديل: ' + m.title;
+        document.getElementById('submitBtn').textContent = '💾 حفظ التعديلات';
+        document.getElementById('cancelBtn').style.display = 'inline-block';
+        previewPoster();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Delete movie
+    async function deleteMovie(id) {
+        const m = allMovies.find(x => x._id === id);
+        if (!m) return;
+        if (!confirm(`هل تريد حذف "${m.title}"؟`)) return;
+        try {
+            const res = await authFetch(`${API}/movies/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                await loadAdminMovies();
+                showNotification('تم الحذف بنجاح 🗑️');
+            } else if (res.status === 401) {
+                showNotification('غير مصرح', 'error');
+            }
+        } catch (err) {
+            showNotification('خطأ في الحذف', 'error');
+        }
+    }
+
+    // Reset form
+    function resetForm() {
+        document.getElementById('movieForm').reset();
+        document.getElementById('editId').value = '';
+        document.getElementById('formTitle').textContent = '➕ إضافة فيلم أو مسلسل';
+        document.getElementById('submitBtn').textContent = '💾 حفظ';
+        document.getElementById('cancelBtn').style.display = 'none';
+        document.getElementById('posterPreview').style.display = 'none';
+    }
+
+    // Preview poster image
+    function previewPoster() {
+        const url = document.getElementById('moviePoster').value;
+        const preview = document.getElementById('posterPreview');
+        const img = document.getElementById('posterImg');
+        if (url) {
+            img.src = url;
+            preview.style.display = 'block';
+        } else {
+            preview.style.display = 'none';
+        }
+    }
+
+    // Show notification
+    function showNotification(msg, type = 'success') {
+        const n = document.createElement('div');
+        n.className = `notification ${type}`;
+        n.textContent = msg;
+        document.body.appendChild(n);
+        setTimeout(() => n.classList.add('show'), 10);
+        setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 300); }, 3000);
+    }
+
+    // Escape HTML for text content
+    function escapeHtml(str) {
+        if (!str && str !== 0) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Escape attribute values (for src, href etc.)
+    function escapeAttr(str) {
+        if (!str) return '';
+        // Only allow http/https URLs
+        if (!/^https?:\/\//i.test(str)) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+</script>
+</body>
+</html>
