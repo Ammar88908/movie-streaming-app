@@ -3,14 +3,32 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Rate limiters
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const adminLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(generalLimiter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // MongoDB Connection
@@ -119,7 +137,7 @@ app.delete('/api/movies/:id', requireAdmin, async (req, res) => {
 });
 
 // POST /api/admin/verify - Verify admin password and issue a session token
-app.post('/api/admin/verify', (req, res) => {
+app.post('/api/admin/verify', adminLimiter, (req, res) => {
     const { password } = req.body;
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     if (password === adminPassword) {
