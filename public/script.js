@@ -1,4 +1,6 @@
-const API = '/api';
+import { ref, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+import { db } from './firebase-init.js';
+
 let currentCategory = 'جميع';
 let searchTimeout = null;
 let allMovies = [];
@@ -9,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Set active category
-function setCategory(btn) {
+window.setCategory = function(btn) {
     document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentCategory = btn.dataset.cat;
@@ -19,7 +21,7 @@ function setCategory(btn) {
 }
 
 // Handle search
-function handleSearch() {
+window.handleSearch = function() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(applyFilters, 300);
 }
@@ -40,19 +42,23 @@ function applyFilters() {
     renderMovies(filtered);
 }
 
-// Fetch movies from API
-async function loadMovies() {
+// Fetch movies from Firebase with real-time updates
+function loadMovies() {
     showLoading(true);
-    try {
-        const res = await fetch(`${API}/movies`);
-        if (!res.ok) throw new Error('Failed to fetch');
-        allMovies = await res.json();
+    const moviesRef = ref(db, 'movies');
+    onValue(moviesRef, (snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            allMovies = Object.entries(data).map(([id, movie]) => ({ id, ...movie }));
+        } else {
+            allMovies = [];
+        }
         renderMovies(allMovies);
-    } catch (err) {
-        showError('تعذر تحميل البيانات. تأكد من تشغيل الخادم.');
-    } finally {
         showLoading(false);
-    }
+    }, (err) => {
+        showError('تعذر تحميل البيانات.');
+        showLoading(false);
+    });
 }
 
 // Render movies grid
@@ -97,7 +103,7 @@ function renderMovies(movies) {
 }
 
 // Play movie in modal
-function playMovie(movie) {
+window.playMovie = function(movie) {
     const modal = document.getElementById('playerModal');
     const container = document.getElementById('playerContainer');
     const details = document.getElementById('movieDetails');
@@ -159,7 +165,7 @@ function buildPlayer(url) {
 }
 
 // Close modal
-function closePlayer() {
+window.closePlayer = function() {
     const modal = document.getElementById('playerModal');
     const container = document.getElementById('playerContainer');
     modal.style.display = 'none';
@@ -167,7 +173,7 @@ function closePlayer() {
     document.body.style.overflow = '';
 }
 
-function closeModalOnBackdrop(e) {
+window.closeModalOnBackdrop = function(e) {
     if (e.target === document.getElementById('playerModal')) {
         closePlayer();
     }
