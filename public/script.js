@@ -1,4 +1,21 @@
-const API = '/api';
+// Firebase configuration
+// NOTE: Firebase API keys for web apps are designed to be public.
+// Real security is enforced via Firebase Realtime Database Security Rules.
+// Ensure your Firebase project has appropriate rules before deploying.
+// See: https://firebase.google.com/docs/database/security
+const firebaseConfig = {
+    apiKey: "AIzaSyDGPFQdTeo_R1nWTFxEo7ioZyIaXElCJXk",
+    authDomain: "aflamk-3c9be.firebaseapp.com",
+    projectId: "aflamk-3c9be",
+    storageBucket: "aflamk-3c9be.firebasestorage.app",
+    messagingSenderId: "27227290582",
+    appId: "1:27227290582:web:6abbea21c88d4fbc660277",
+    databaseURL: "https://aflamk-3c9be-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
 let currentCategory = 'جميع';
 let searchTimeout = null;
 let allMovies = [];
@@ -40,19 +57,24 @@ function applyFilters() {
     renderMovies(filtered);
 }
 
-// Fetch movies from API
-async function loadMovies() {
+// Load movies from Firebase Realtime Database (real-time listener)
+function loadMovies() {
     showLoading(true);
-    try {
-        const res = await fetch(`${API}/movies`);
-        if (!res.ok) throw new Error('Failed to fetch');
-        allMovies = await res.json();
+    db.ref('aflaamak/movies').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            allMovies = Object.entries(data).map(([id, movie]) => ({ _id: id, ...movie }));
+            // Sort newest first
+            allMovies.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        } else {
+            allMovies = [];
+        }
         renderMovies(allMovies);
-    } catch (err) {
-        showError('تعذر تحميل البيانات. تأكد من تشغيل الخادم.');
-    } finally {
         showLoading(false);
-    }
+    }, () => {
+        showError('تعذر تحميل البيانات. تحقق من الاتصال بالإنترنت.');
+        showLoading(false);
+    });
 }
 
 // Render movies grid

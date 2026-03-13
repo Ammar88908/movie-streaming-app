@@ -6,6 +6,8 @@
     <title>افلامك | لوحة الإدارة</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -114,55 +116,63 @@
 </div>
 
 <script>
-    const API = '/api';
+    // Firebase configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGPFQdTeo_R1nWTFxEo7ioZyIaXElCJXk",
+        authDomain: "aflamk-3c9be.firebaseapp.com",
+        projectId: "aflamk-3c9be",
+        storageBucket: "aflamk-3c9be.firebasestorage.app",
+        messagingSenderId: "27227290582",
+        appId: "1:27227290582:web:6abbea21c88d4fbc660277",
+        databaseURL: "https://aflamk-3c9be-default-rtdb.europe-west1.firebasedatabase.app"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Admin password (client-side check only — real security MUST be enforced via
+    // Firebase Realtime Database Security Rules. See:
+    // https://firebase.google.com/docs/database/security
+    // For stronger auth, replace this with Firebase Authentication.)
+    const ADMIN_PASSWORD = 'admin123';
+
     let allMovies = [];
 
-    // Return stored admin token
-    function getToken() {
-        return sessionStorage.getItem('adminToken') || '';
-    }
-
     // Admin Login
-    async function adminLogin(e) {
+    function adminLogin(e) {
         e.preventDefault();
         const password = document.getElementById('adminPassword').value;
-        try {
-            const res = await fetch(`${API}/admin/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            });
-            const data = await res.json();
-            if (data.success && data.token) {
-                sessionStorage.setItem('adminToken', data.token);
-                document.getElementById('loginScreen').style.display = 'none';
-                document.getElementById('adminPanel').style.display = 'block';
-                loadAdminMovies();
-            } else {
-                document.getElementById('loginError').style.display = 'block';
-            }
-        } catch (err) {
+        if (password === ADMIN_PASSWORD) {
+            sessionStorage.setItem('adminLoggedIn', 'true');
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'block';
+            loadAdminMovies();
+        } else {
             document.getElementById('loginError').style.display = 'block';
         }
     }
 
-    // Check if already logged in (token present)
-    if (getToken()) {
+    // Check if already logged in
+    if (sessionStorage.getItem('adminLoggedIn') === 'true') {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('adminPanel').style.display = 'block';
         loadAdminMovies();
     }
 
-    // Load all movies
-    async function loadAdminMovies() {
-        try {
-            const res = await fetch(`${API}/movies`);
-            if (!res.ok) throw new Error('failed');
-            allMovies = await res.json();
+    // Load all movies with real-time listener
+    function loadAdminMovies() {
+        db.ref('aflaamak/movies').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                allMovies = Object.entries(data).map(([id, movie]) => ({ _id: id, ...movie }));
+                allMovies.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            } else {
+                allMovies = [];
+            }
             renderAdminList(allMovies);
-        } catch (err) {
+        }, () => {
             document.getElementById('adminMovieList').innerHTML = '<p class="error-msg">خطأ في تحميل البيانات</p>';
-        }
+        });
     }
 
     // Render admin movie list
@@ -202,27 +212,17 @@
         renderAdminList(allMovies.filter(m => m.title.toLowerCase().includes(q)));
     }
 
-    // Authenticated fetch helper
-    function authFetch(url, options = {}) {
-        return fetch(url, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                'x-admin-token': getToken(),
-                ...(options.headers || {})
-            }
-        });
-    }
-
     // Save (Add or Update) movie
     async function saveMovie(e) {
         e.preventDefault();
+        const validCategories = ['أفلام', 'مسلسلات', 'أنمي', 'وثائقي'];
+        const category = document.getElementById('movieCategory').value;
         const payload = {
             title: document.getElementById('movieTitle').value.trim(),
             description: document.getElementById('movieDesc').value.trim(),
             year: parseInt(document.getElementById('movieYear').value) || new Date().getFullYear(),
-            category: document.getElementById('movieCategory').value,
-            rating: parseFloat(document.getElementById('movieRating').value) || 5,
+            category: validCategories.includes(category) ? category : 'أفلام',
+            rating: Math.min(10, Math.max(1, parseFloat(document.getElementById('movieRating').value) || 5)),
             poster: document.getElementById('moviePoster').value.trim(),
             videoUrl: document.getElementById('movieVideo').value.trim()
         };
@@ -233,33 +233,16 @@
         btn.textContent = 'جاري الحفظ...';
 
         try {
-            let res;
             if (id) {
-                res = await authFetch(`${API}/movies/${id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(payload)
-                });
+                await db.ref(`aflaamak/movies/${id}`).update(payload);
             } else {
-                res = await authFetch(`${API}/movies`, {
-                    method: 'POST',
-                    body: JSON.stringify(payload)
-                });
+                payload.createdAt = Date.now();
+                await db.ref('aflaamak/movies').push(payload);
             }
-
-            if (res.ok) {
-                resetForm();
-                await loadAdminMovies();
-                showNotification(id ? 'تم التعديل بنجاح ✅' : 'تمت الإضافة بنجاح ✅');
-            } else if (res.status === 401) {
-                sessionStorage.removeItem('adminToken');
-                showNotification('انتهت الجلسة. يرجى إعادة تسجيل الدخول.', 'error');
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                const err = await res.json();
-                showNotification('خطأ: ' + (err.error || 'حدث خطأ'), 'error');
-            }
+            resetForm();
+            showNotification(id ? 'تم التعديل بنجاح ✅' : 'تمت الإضافة بنجاح ✅');
         } catch (err) {
-            showNotification('خطأ في الاتصال بالخادم', 'error');
+            showNotification('خطأ في حفظ البيانات', 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = '💾 حفظ';
@@ -291,13 +274,8 @@
         if (!m) return;
         if (!confirm(`هل تريد حذف "${m.title}"؟`)) return;
         try {
-            const res = await authFetch(`${API}/movies/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                await loadAdminMovies();
-                showNotification('تم الحذف بنجاح 🗑️');
-            } else if (res.status === 401) {
-                showNotification('غير مصرح', 'error');
-            }
+            await db.ref(`aflaamak/movies/${id}`).remove();
+            showNotification('تم الحذف بنجاح 🗑️');
         } catch (err) {
             showNotification('خطأ في الحذف', 'error');
         }
