@@ -113,56 +113,61 @@
     </div>
 </div>
 
-<script>
-    const API = '/api';
-    let allMovies = [];
+<script type="module">
+    import { ref, get, set, remove, push, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+    import { db } from './firebase-init.js';
 
-    // Return stored admin token
-    function getToken() {
-        return sessionStorage.getItem('adminToken') || '';
-    }
+    let allMovies = [];
+    let unsubscribeMovies = null;
 
     // Admin Login
-    async function adminLogin(e) {
-        e.preventDefault();
+    window.adminLogin = async function(event) {
+        event.preventDefault();
         const password = document.getElementById('adminPassword').value;
+        const loginError = document.getElementById('loginError');
+
         try {
-            const res = await fetch(`${API}/admin/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            });
-            const data = await res.json();
-            if (data.success && data.token) {
-                sessionStorage.setItem('adminToken', data.token);
-                document.getElementById('loginScreen').style.display = 'none';
-                document.getElementById('adminPanel').style.display = 'block';
-                loadAdminMovies();
+            const adminRef = ref(db, 'admin/password');
+            const snapshot = await get(adminRef);
+
+            if (snapshot.exists()) {
+                const correctPassword = snapshot.val();
+                if (password === correctPassword) {
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('adminPanel').style.display = 'block';
+                    loadMovies();
+                } else {
+                    loginError.style.display = 'block';
+                    loginError.textContent = 'كلمة المرور غير صحيحة';
+                    document.getElementById('adminPassword').value = '';
+                }
             } else {
-                document.getElementById('loginError').style.display = 'block';
+                loginError.style.display = 'block';
+                loginError.textContent = 'حدث خطأ في الاتصال';
             }
-        } catch (err) {
-            document.getElementById('loginError').style.display = 'block';
+        } catch (error) {
+            console.error('خطأ:', error);
+            loginError.style.display = 'block';
+            loginError.textContent = 'حدث خطأ في الاتصال';
         }
-    }
+    };
 
-    // Check if already logged in (token present)
-    if (getToken()) {
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('adminPanel').style.display = 'block';
-        loadAdminMovies();
-    }
-
-    // Load all movies
-    async function loadAdminMovies() {
-        try {
-            const res = await fetch(`${API}/movies`);
-            if (!res.ok) throw new Error('failed');
-            allMovies = await res.json();
+    // Load all movies with real-time updates
+    function loadMovies() {
+        if (unsubscribeMovies) unsubscribeMovies();
+        const moviesRef = ref(db, 'movies');
+        unsubscribeMovies = onValue(moviesRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                allMovies = Object.entries(data).map(([id, movie]) => ({ id, ...movie }));
+            } else {
+                allMovies = [];
+            }
             renderAdminList(allMovies);
-        } catch (err) {
+        }, (error) => {
+            console.error('خطأ في تحميل الأفلام:', error);
             document.getElementById('adminMovieList').innerHTML = '<p class="error-msg">خطأ في تحميل البيانات</p>';
-        }
+        });
     }
 
     // Render admin movie list
@@ -173,7 +178,7 @@
             return;
         }
         container.innerHTML = movies.map(m => {
-            const id = escapeHtml(m._id);
+            const id = escapeHtml(m.id);
             const posterHtml = m.poster
                 ? `<img src="${escapeAttr(m.poster)}" alt="${escapeHtml(m.title)}" onerror="this.style.display='none'">`
                 : '<div class="no-poster">🎬</div>';
@@ -197,26 +202,14 @@
     }
 
     // Filter admin list
-    function filterAdminList() {
+    window.filterAdminList = function() {
         const q = document.getElementById('adminSearch').value.toLowerCase();
         renderAdminList(allMovies.filter(m => m.title.toLowerCase().includes(q)));
-    }
-
-    // Authenticated fetch helper
-    function authFetch(url, options = {}) {
-        return fetch(url, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                'x-admin-token': getToken(),
-                ...(options.headers || {})
-            }
-        });
-    }
+    };
 
     // Save (Add or Update) movie
-    async function saveMovie(e) {
-        e.preventDefault();
+    window.saveMovie = async function(event) {
+        event.preventDefault();
         const payload = {
             title: document.getElementById('movieTitle').value.trim(),
             description: document.getElementById('movieDesc').value.trim(),
@@ -233,44 +226,27 @@
         btn.textContent = 'جاري الحفظ...';
 
         try {
-            let res;
             if (id) {
-                res = await authFetch(`${API}/movies/${id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(payload)
-                });
+                await set(ref(db, `movies/${id}`), payload);
             } else {
-                res = await authFetch(`${API}/movies`, {
-                    method: 'POST',
-                    body: JSON.stringify(payload)
-                });
+                await push(ref(db, 'movies'), payload);
             }
-
-            if (res.ok) {
-                resetForm();
-                await loadAdminMovies();
-                showNotification(id ? 'تم التعديل بنجاح ✅' : 'تمت الإضافة بنجاح ✅');
-            } else if (res.status === 401) {
-                sessionStorage.removeItem('adminToken');
-                showNotification('انتهت الجلسة. يرجى إعادة تسجيل الدخول.', 'error');
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                const err = await res.json();
-                showNotification('خطأ: ' + (err.error || 'حدث خطأ'), 'error');
-            }
-        } catch (err) {
-            showNotification('خطأ في الاتصال بالخادم', 'error');
+            resetForm();
+            showNotification(id ? 'تم التعديل بنجاح ✅' : 'تمت الإضافة بنجاح ✅');
+        } catch (error) {
+            console.error('خطأ في الحفظ:', error);
+            showNotification('خطأ في الحفظ', 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = '💾 حفظ';
         }
-    }
+    };
 
     // Edit movie
-    function editMovie(id) {
-        const m = allMovies.find(x => x._id === id);
+    window.editMovie = function(id) {
+        const m = allMovies.find(x => x.id === id);
         if (!m) return;
-        document.getElementById('editId').value = m._id;
+        document.getElementById('editId').value = m.id;
         document.getElementById('movieTitle').value = m.title;
         document.getElementById('movieDesc').value = m.description || '';
         document.getElementById('movieYear').value = m.year || '';
@@ -283,38 +259,34 @@
         document.getElementById('cancelBtn').style.display = 'inline-block';
         previewPoster();
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    };
 
     // Delete movie
-    async function deleteMovie(id) {
-        const m = allMovies.find(x => x._id === id);
+    window.deleteMovie = async function(id) {
+        const m = allMovies.find(x => x.id === id);
         if (!m) return;
         if (!confirm(`هل تريد حذف "${m.title}"؟`)) return;
         try {
-            const res = await authFetch(`${API}/movies/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                await loadAdminMovies();
-                showNotification('تم الحذف بنجاح 🗑️');
-            } else if (res.status === 401) {
-                showNotification('غير مصرح', 'error');
-            }
-        } catch (err) {
+            await remove(ref(db, `movies/${id}`));
+            showNotification('تم الحذف بنجاح 🗑️');
+        } catch (error) {
+            console.error('خطأ في الحذف:', error);
             showNotification('خطأ في الحذف', 'error');
         }
-    }
+    };
 
     // Reset form
-    function resetForm() {
+    window.resetForm = function() {
         document.getElementById('movieForm').reset();
         document.getElementById('editId').value = '';
         document.getElementById('formTitle').textContent = '➕ إضافة فيلم أو مسلسل';
         document.getElementById('submitBtn').textContent = '💾 حفظ';
         document.getElementById('cancelBtn').style.display = 'none';
         document.getElementById('posterPreview').style.display = 'none';
-    }
+    };
 
     // Preview poster image
-    function previewPoster() {
+    window.previewPoster = function() {
         const url = document.getElementById('moviePoster').value;
         const preview = document.getElementById('posterPreview');
         const img = document.getElementById('posterImg');
@@ -324,7 +296,7 @@
         } else {
             preview.style.display = 'none';
         }
-    }
+    };
 
     // Show notification
     function showNotification(msg, type = 'success') {
